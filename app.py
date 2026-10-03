@@ -1,7 +1,6 @@
 import datetime
-from fastapi import FastAPI, HTTPException, Query
-from nsepythonserver import nse_quote_ltp
 from typing import Optional
+from fastapi import FastAPI, HTTPException, Query
 import pandas as pd
 from jugaad_data.nse import index_raw
 
@@ -60,7 +59,6 @@ def get_index_data(
 
         # Data formatting & cleanup
         if 'HistoricalDate' in df.columns:
-            # Parse date strings returned by NSE (e.g., '01 Oct 2026' or ISO dates)
             df['HistoricalDate'] = pd.to_datetime(df['HistoricalDate']).dt.strftime('%Y-%m-%d')
         
         if 'CLOSE' in df.columns:
@@ -68,13 +66,16 @@ def get_index_data(
             
         df = df.sort_values('HistoricalDate').reset_index(drop=True)
 
+        # Fix NaN values to prevent JSON serialization crash
+        clean_records = df.where(pd.notnull(df), None).to_dict(orient="records")
+
         return {
             "status": "success",
             "symbol": symbol,
             "from_date": str(start_date),
             "to_date": str(end_date),
-            "count": len(df),
-            "data": df.to_dict(orient="records")
+            "count": len(clean_records),
+            "data": clean_records
         }
 
     except ValueError:
